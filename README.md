@@ -36,6 +36,12 @@ If the configuration file has a different name then use:
 python main.py --config 'different_name.json' example_command
 ```
 
+The `main.py` file also includes a command-line option to calculate the average execution time of a command with the following command:
+```shell
+python main.py --time 10
+```
+where the number indicates the number of times the command is executed.
+
 ## Pylint
 Please use pylint to style check and error check your code. It is one of the installed packages.
 
