@@ -3,10 +3,9 @@ import json
 CONFIG = {}
 
 def set_config(file_path):
-    with open(file_path, 'r') as config_file:
+    with open(file_path, 'r', encoding='utf-8') as config_file:
         CONFIG.clear()
         CONFIG.update(json.load(config_file))
-
 
 def get_config(*keys, config=None, **kwargs):
     if config is None:
