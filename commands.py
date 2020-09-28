@@ -2,7 +2,6 @@ from config import get_config
 import numpy as np
 import pandas as pd
 from scipy.stats import poisson
-from concepts import bisection
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
