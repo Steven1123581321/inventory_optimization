@@ -1,7 +1,9 @@
 import argparse
+from config import set_config, get_config
+import cProfile
 
 from commands import (
-    example_message
+    hooke_reeves_example
 )
 from ttictoc import TicToc
 from config import set_config
@@ -12,17 +14,17 @@ def main():
     # print('Configuration:\n' + json.dumps(CONFIG, indent=4))
 
     # Possible commands
-    commands = dict()
-    commands['example_command'] = example_message
+    command_selection = {
+        'hooke_reeves_example':hooke_reeves_example,
+    }
 
     # Select what to do based on input arguments
     parser = argparse.ArgumentParser(
-        description=
-        'A module with an example package.'
+        description='transaction exclusions.'
     )
     parser.add_argument(
         'command',
-        choices=list(commands.keys()),
+        choices=list(command_selection.keys()),
         help='command to execute'
     )
     parser.add_argument(
@@ -32,44 +34,43 @@ def main():
         help='path to configuration JSON'
     )
     parser.add_argument(
-        '--time',
-        nargs='?',
+        '--profile',
         type=int,
         default=0,
-        help='time running the selected command [TIME] times'
+        help='number of times to run the selected command while profiling'
     )
     args = parser.parse_args()
 
     # Load settings from json
     set_config(args.config)
 
-    # Time?
-    if args.time:
-        t = TicToc()
-        t.tic()
-        print('\nStarting timer.')
+    # Profile?
+    if args.profile:
+        print('\nStarting profiler.\n')
+        profiler = cProfile.Profile(
+            builtins=True
+        )
+        profiler.enable()
 
     # Execute command
-    print('Executing command "{}".'.format(args.command))
-    command = commands.get(
+    print('Executing command "{}".\n'.format(args.command))
+    command = command_selection.get(
         args.command,
         error
     )
-    for count in range(max(1, args.time)):
-        if args.time > 1:
-            print(f'{1 + count} of {args.time}', end='\r')
+    for count in range(max(1, args.profile)):
+        if args.profile > 1 and args.profile < 101:
+            print(f'{1 + count} of {args.profile}')
         command()
 
-    # Time?
-    if args.time:
-        t.toc()
-        print(
-            f'Total time elasped: {t.elapsed:8.3f} seconds' +
-            f'\nAverage time: {t.elapsed / args.time:8.3f}.'
-        )
+    # Profile?
+    if args.profile:
+        profiler.disable()
+        profiler.dump_stats(args.command + '.cprof')
+        print('\nFinished profiling.')
 
     # Finished
-    input("\nPress [enter] to exit script...")
+    input("Press [enter] to exit script...")
     print('Done.')
 
 
