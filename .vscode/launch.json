@@ -1,0 +1,20 @@
+{"version": "0.2.0",
+"configurations": [
+    {
+        "name": "hooke_reeves_example",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["hooke_reeves_example"]
+    },
+    {
+        "name": "bisection",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["bisection"]
+    }
+]
+}

@@ -1,0 +1,23 @@
+{
+    "cost_parameters":{
+        "waste_cost":10,
+        "buying_price":10,
+        "holding_cost_percentage":0.25,
+        "order_cost":15
+    },
+    "demand_parameters":{
+        "yearly_demand":1000,
+        "demand_during_lifetime":10,
+        "beta_value_geometric_distribution":0.25
+    },
+    "algorithm_parameters":{
+        "bisection":{
+            "number_of_iterations":200,
+            "plot_waste_algorithm_outcome":true
+        },
+        "hooke_reeves":{
+            "alpha":1,
+            "eps":0.01
+        }
+    }
+}
