@@ -1,9 +1,9 @@
 {
     "cost_parameters":{
-        "waste_cost":10,
-        "buying_price":10,
+        "waste_cost":1,
+        "buying_price":1,
         "holding_cost_percentage":0.25,
-        "order_cost":15
+        "order_cost":75
     },
     "demand_parameters":{
         "yearly_demand":1000,
@@ -18,6 +18,8 @@
         "hooke_reeves":{
             "alpha":1,
             "eps":0.01
+        },
+        "adagrad":{
         }
     }
 }

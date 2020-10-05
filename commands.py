@@ -1,7 +1,11 @@
 from config import get_config
 import numpy as np
 import pandas as pd
+import math
+import scipy.stats as st
 from scipy.stats import poisson
+import sympy
+from sympy import Symbol, diff
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
@@ -39,8 +43,6 @@ def bisection_example():
         plt.plot(costs)
         plt.ylabel("Order quantity")
         plt.xlabel("Costs")
-        plt.xticks(np.arange(1, EOQ_no_waste, 5.0))
-        plt.xticks(rotation=90)
         plt.title("The optimal order quantity is "+str(EOQ_with_waste))
         plt.show()
     else:
@@ -81,7 +83,7 @@ def hooke_reeves_example():
     d = demand_parameters["yearly_demand"]
     h = i*p
     b = demand_parameters["beta_value_geometric_distribution"]
-    f = lambda x: ((o+p*x[0]+h*((x[0]*(x[0]-1))/5))/(1/(1-b)+x[0]))+(h*x[0])/(1+(x[0]*(1-b)))
+    f = lambda x: ((o+p*x[0]+h*((x[0]*(x[0]-1))/2))/(1/(1-b)+x[0]))+(h*x[0])/(1+(x[0]*(1-b)))
     solution = hooke_reeves(f, [50], 1, 0.01, [1])
     for i in range(len(solution)):
         print("x"+str(i)+"=", solution[i])
@@ -105,3 +107,194 @@ def hooke_reeves(f, x, a, eps, minimum, fraction=0.5):
             if x[i] <= minimum[i]:
                 return minimum
     return x
+
+##########################################
+#RMSProp algorithmM#
+##function x_0**2+x_1**2##
+##########################################
+
+'''
+do the example with the EOQ. Now you need to change the learning rate to 0.9.
+This shows the parametrization signficance for neural networks optimization.
+'''
+
+def RMSProp_example():
+    cost_parameters = get_config("cost_parameters")
+    demand_parameters = get_config("demand_parameters")
+    algorithm_parameters = get_config("algorithm_parameters", "adagrad")
+    p = cost_parameters["buying_price"]
+    h = cost_parameters["holding_cost_percentage"]
+    o = cost_parameters["order_cost"]
+    d = demand_parameters["yearly_demand"]
+    '''
+    x = Symbol('x')
+    y = Symbol('y')
+    f = x**2+y**2
+    partialderiv= diff(f, x)
+    partial-derivative_1 = partialderiv.doit()
+    partialderiv= diff(f, y)
+    partial-derivative_2 = partialderiv.doit()
+    '''
+    p_1 = lambda x: 2*x[0]
+    p_2 = lambda x: 2*x[1]
+    solution = np.round(RMSProp(p_1, p_2, [50,50], 0.01, 0.1, 0.9, 10000),2)
+    for i in range(len(solution)):
+        print("x"+str(i)+"=", solution[i])
+
+def RMSProp(p_1,p_2, x, a, e, gamma, n):
+    r= len(x)
+    for k in range(n):
+        for i in range(r):
+            if i == 0:
+                x_prime = p_1(x)
+            if i == 1:
+                x_prime = p_2(x)
+            s = x_prime**2
+            if k==0:
+                RMS = math.sqrt(s)
+            else:
+                RMS = math.sqrt(gamma*s_prime+(1-gamma)*s)
+            x[i] -= (a*x_prime)/(e+RMS)
+            s_prime=s
+    return x
+
+
+##########################################
+#Metropolis-Hastings algorithm#
+##forecasting##
+##########################################
+def get_proposal(mean_current, std_current, proposal_width = 0.5):
+        return np.random.normal(mean_current, proposal_width), np.random.normal(std_current, proposal_width)
+
+def accept_proposal(mean_proposal, std_proposal, mean_current, std_current, prior_mean, prior_std, data):
+    def prior(mean, std, prior_mean, prior_std):
+        return st.norm(prior_mean[0], prior_mean[1]).logpdf(mean)+ st.norm(prior_std[0], prior_std[1]).logpdf(std)
+
+    def likelihood(mean, std, data):
+        return np.sum(st.norm(mean, std).logpdf(data))
+
+    prior_current = prior(mean_current, std_current, prior_mean, prior_std)
+    likelihood_current = likelihood(mean_current, std_current, data)
+    prior_proposal = prior(mean_proposal, std_proposal, prior_mean, prior_std)
+    likelihood_proposal = likelihood(mean_proposal, std_proposal, data)
+    return (prior_proposal + likelihood_proposal) - (prior_current + likelihood_current)
+
+def get_trace(data, samples = 5000):
+    mean_prior = 5
+    std_prior = 5
+    mean_current = mean_prior
+    std_current = std_prior
+    trace = {
+        "mean": [mean_current],
+        "std": [std_current]
+    }
+    for i in range(samples):
+        mean_proposal, std_proposal = get_proposal(mean_current, std_current)
+        acceptance_prob = accept_proposal(mean_proposal, std_proposal, mean_current, \
+                                         std_current, [mean_prior, std_prior], \
+                                          [mean_prior, std_prior], data)
+        if math.log(np.random.rand()) < acceptance_prob:
+            mean_current = mean_proposal
+            std_current = std_proposal
+        trace['mean'].append(mean_current)
+        trace['std'].append(std_current)
+    return trace
+
+def metropolis_hasting_example():
+    meanX = 1.5
+    stdX = 1.2
+    X = np.random.normal(meanX, stdX, size = 1000)
+    trace = get_trace(X)
+    mean = np.mean(trace['mean'])
+    std = np.mean(trace['std'])
+    print(mean, std)
+
+##########################################
+#Automatic differentiation#
+##partial derivatives of x**2+y**2##
+##########################################
+
+class DualNumber:
+    def __init__(self, real, dual):
+        self.real = real
+        self.dual = dual
+
+    def __add__(self, other):
+        if isinstance(other, DualNumber):
+            return DualNumber(self.real + other.real,
+                              self.dual + other.dual)
+        else:
+            return DualNumber(self.real + other, self.dual)
+
+    def __sub__(self, other):
+        if isinstance(other, DualNumber):
+            return DualNumber(self.real - other.real,
+                              self.dual - other.dual)
+        else:
+            return DualNumber(self.real - other, self.dual)
+
+    def __mul__(self, other):
+        if isinstance(other, DualNumber):
+            return DualNumber(self.real * other.real,
+                              self.real * other.dual + self.dual * other.real)
+        else:
+            return DualNumber(self.real * other, self.dual * other)
+    __rmul__ = __mul__
+
+    def __truediv__(self, other):
+        if isinstance(other, DualNumber):
+            return DualNumber(self.real/other.real,
+                              (self.dual*other.real - self.real*other.dual)/(other.real**2))
+        else:
+            return (1/other) * self
+
+    def __floordiv__(self, other):
+        if isinstance(other, DualNumber):
+            return DualNumber(self.real/other.real,
+                                (self.dual*other.real - self.real*other.dual)/(other.real**2))
+        else:
+            return (1/other) * self
+
+    def __rtruediv__(self, other):
+        return DualNumber(other, 0).__truediv__(self)
+
+    def __rfloordiv__(self, other):
+        return DualNumber(other, 0).__floordiv__(self)
+
+    def __pow__(self, other):
+        return DualNumber(self.real**other,
+                          self.dual * other * self.real**(other - 1))
+
+    def __repr__(self):
+        return repr(self.real) + ' + ' + repr(self.dual) + '*epsilon'
+
+def auto_diff(f, x):
+    return f(DualNumber(x, 1.)).dual
+
+def diff():
+    cost_parameters = get_config("cost_parameters")
+    demand_parameters = get_config("demand_parameters")
+    p = cost_parameters["buying_price"]
+    h = cost_parameters["holding_cost_percentage"]
+    o = cost_parameters["order_cost"]
+    d = demand_parameters["yearly_demand"]
+    p1 = auto_diff(lambda x: d/x*o+x/2*h*p, 17 )
+    x = 1
+    p2 = auto_diff(lambda y: x**2+y**-1, 5 )
+    print(p1, p2)
+
+##########################################
+#Simulated Annealing#
+##Auchkley function##
+##########################################
+
+
+##########################################
+#Point iteration algorithm#
+##Nonstocked decision function##
+##########################################
+
+##########################################
+#Cuckoo Search#
+##Nonstocked decision function##
+##########################################

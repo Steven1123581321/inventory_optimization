@@ -4,7 +4,10 @@ import cProfile
 
 from commands import (
     hooke_reeves_example,
-    bisection_example
+    bisection_example,
+    RMSProp_example,
+    diff,
+    metropolis_hasting_example
 )
 from ttictoc import TicToc
 from config import set_config
@@ -17,7 +20,10 @@ def main():
     # Possible commands
     command_selection = {
         'hooke_reeves_example':hooke_reeves_example,
-        'bisection':bisection_example
+        'bisection':bisection_example,
+        'RMSProp':RMSProp_example,
+        'diff':diff,
+        'metropolis_hasting_example':metropolis_hasting_example
     }
 
     # Select what to do based on input arguments

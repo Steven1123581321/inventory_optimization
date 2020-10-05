@@ -15,6 +15,30 @@
         "program": "${workspaceFolder}/main.py",
         "console": "integratedTerminal",
         "args": ["bisection"]
+    },
+    {
+        "name": "RMSProp",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["RMSProp"]
+    },
+    {
+        "name": "diff",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["diff"]
+    },
+    {
+        "name": "metropolis_hasting_example",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["metropolis_hasting_example"]
     }
 ]
 }
