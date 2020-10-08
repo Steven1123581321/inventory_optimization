@@ -1,4 +1,5 @@
 from config import get_config
+from concepts.Automatic_differentiation.reverse_accumulation import reverse_autodiff, Overloader
 import numpy as np
 import pandas as pd
 import math
@@ -210,8 +211,8 @@ def metropolis_hasting_example():
     print(mean, std)
 
 ##########################################
-#Automatic differentiation#
-##partial derivatives of x**2+y**2##
+#Automatic differentiation- forward accumulation#
+##derivative of d/x*o+x/2*h*p##
 ##########################################
 
 class DualNumber:
@@ -271,17 +272,31 @@ class DualNumber:
 def auto_diff(f, x):
     return f(DualNumber(x, 1.)).dual
 
-def diff():
+def forward_diff():
     cost_parameters = get_config("cost_parameters")
     demand_parameters = get_config("demand_parameters")
     p = cost_parameters["buying_price"]
     h = cost_parameters["holding_cost_percentage"]
     o = cost_parameters["order_cost"]
     d = demand_parameters["yearly_demand"]
-    p1 = auto_diff(lambda x: d/x*o+x/2*h*p, 17 )
-    x = 1
-    p2 = auto_diff(lambda y: x**2+y**-1, 5 )
-    print(p1, p2)
+    f = auto_diff(lambda x: d/x*o+x/2*h*p, 17 )
+    print(f)
+
+##########################################
+#Automatic differentiation: reverse accumulation#
+##derivative of d/x*o+x/2*h*p##
+##########################################
+
+def reverse_diff():
+    cost_parameters = get_config("cost_parameters")
+    demand_parameters = get_config("demand_parameters")
+    p = cost_parameters["buying_price"]
+    h = cost_parameters["holding_cost_percentage"]
+    o = cost_parameters["order_cost"]
+    d = demand_parameters["yearly_demand"]
+    x = Overloader(17)
+    f = reverse_autodiff(d/x*o+x/2*h*p, x)
+    print(f)
 
 ##########################################
 #Simulated Annealing#

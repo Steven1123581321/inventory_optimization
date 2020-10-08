@@ -6,7 +6,8 @@ from commands import (
     hooke_reeves_example,
     bisection_example,
     RMSProp_example,
-    diff,
+    forward_diff,
+    reverse_diff,
     metropolis_hasting_example
 )
 from ttictoc import TicToc
@@ -22,7 +23,8 @@ def main():
         'hooke_reeves_example':hooke_reeves_example,
         'bisection':bisection_example,
         'RMSProp':RMSProp_example,
-        'diff':diff,
+        'diff':forward_diff,
+        'diff2':reverse_diff,
         'metropolis_hasting_example':metropolis_hasting_example
     }
 
