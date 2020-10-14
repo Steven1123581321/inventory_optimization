@@ -47,6 +47,30 @@
         "program": "${workspaceFolder}/main.py",
         "console": "integratedTerminal",
         "args": ["diff2"]
+    },
+    {
+        "name": "adam",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["adam"]
+    },
+    {
+        "name": "annealing",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["annealing"]
+    },
+    {
+        "name": "rmse",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["rmse"]
     }
 ]
 }

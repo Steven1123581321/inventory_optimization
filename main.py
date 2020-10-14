@@ -8,7 +8,10 @@ from commands import (
     RMSProp_example,
     forward_diff,
     reverse_diff,
-    metropolis_hasting_example
+    metropolis_hasting_example,
+    adam_example,
+    simulated_annealing_example,
+    rmse_adjusted
 )
 from ttictoc import TicToc
 from config import set_config
@@ -25,7 +28,10 @@ def main():
         'RMSProp':RMSProp_example,
         'diff':forward_diff,
         'diff2':reverse_diff,
-        'metropolis_hasting_example':metropolis_hasting_example
+        'metropolis_hasting_example':metropolis_hasting_example,
+        'adam': adam_example,
+        'annealing': simulated_annealing_example,
+        'rmse': rmse_adjusted
     }
 
     # Select what to do based on input arguments

@@ -1,7 +1,7 @@
 {
     "cost_parameters":{
         "waste_cost":1,
-        "buying_price":1,
+        "buying_price":10,
         "holding_cost_percentage":0.25,
         "order_cost":75
     },

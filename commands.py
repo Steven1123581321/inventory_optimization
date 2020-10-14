@@ -1,10 +1,14 @@
 from config import get_config
 from concepts.Automatic_differentiation.reverse_accumulation import reverse_autodiff, Overloader
+import autograd.numpy as numpy
+from autograd import grad
 import numpy as np
 import pandas as pd
+import random
 import math
 import scipy.stats as st
 from scipy.stats import poisson
+import statsmodels.api as sm
 import sympy
 from sympy import Symbol, diff
 import matplotlib.pyplot as plt
@@ -111,7 +115,7 @@ def hooke_reeves(f, x, a, eps, minimum, fraction=0.5):
 
 ##########################################
 #RMSProp algorithmM#
-##function x_0**2+x_1**2##
+##function Rosenbrock and eoq formula##
 ##########################################
 
 '''
@@ -127,22 +131,16 @@ def RMSProp_example():
     h = cost_parameters["holding_cost_percentage"]
     o = cost_parameters["order_cost"]
     d = demand_parameters["yearly_demand"]
-    '''
-    x = Symbol('x')
-    y = Symbol('y')
-    f = x**2+y**2
-    partialderiv= diff(f, x)
-    partial-derivative_1 = partialderiv.doit()
-    partialderiv= diff(f, y)
-    partial-derivative_2 = partialderiv.doit()
-    '''
-    p_1 = lambda x: 2*x[0]
-    p_2 = lambda x: 2*x[1]
-    solution = np.round(RMSProp(p_1, p_2, [50,50], 0.01, 0.1, 0.9, 10000),2)
+    p_1 = lambda x: -2*(1-x[0])-4*5*x[0]*(x[1]-x[0]**2)
+    p_2 = lambda x: 2*5*(x[1]-x[0]**2)
+    p_3 = lambda x:-(d*o)/x[0]**2+h*p*.5
+    # add p_2 when having partial derivatives.
+    solution = np.round(RMSProp(p_1, p_2, [10,10], 0.01, 0.1, 0.9, 2000000),2)
     for i in range(len(solution)):
         print("x"+str(i)+"=", solution[i])
 
-def RMSProp(p_1,p_2, x, a, e, gamma, n):
+# Add p_2 when having partial derivatives.
+def RMSProp(p_1, p_2, x, a, e, gamma, n):
     r= len(x)
     for k in range(n):
         for i in range(r):
@@ -159,6 +157,37 @@ def RMSProp(p_1,p_2, x, a, e, gamma, n):
             s_prime=s
     return x
 
+##########################################
+#Adam algorithmM#
+##function -(d*o)/x[0]**2+h*p*.5##
+##########################################
+
+def adam_example():
+    cost_parameters = get_config("cost_parameters")
+    demand_parameters = get_config("demand_parameters")
+    algorithm_parameters = get_config("algorithm_parameters", "adagrad")
+    p = cost_parameters["buying_price"]
+    h = cost_parameters["holding_cost_percentage"]
+    o = cost_parameters["order_cost"]
+    d = demand_parameters["yearly_demand"]
+    f = lambda x:-(d*o)/x**2+h*p*.5
+    solution = adam(f, 100, 0.9, 0.999, 0.000000001, 0.001, 2000000)
+    print("x"+"=", solution)
+
+def adam(f, x, gamma_v, gamma_s, e, a, n):
+    for k in range(n):
+        x_prime = f(x)
+        x_hat = x
+        if k == 0:
+            v_prime = 0
+            s_prime = 0
+        else:
+            v_prime = gamma_v*v+(1-gamma_v)*x_prime
+            s_prime = gamma_s*s+(1-gamma_s)*x_prime**2
+        x = x_hat-a*v_prime/(e+math.sqrt(s_prime))
+        s = s_prime
+        v = v_prime
+    return x
 
 ##########################################
 #Metropolis-Hastings algorithm#
@@ -233,6 +262,7 @@ class DualNumber:
                               self.dual - other.dual)
         else:
             return DualNumber(self.real - other, self.dual)
+    __rsub__=__sub__
 
     def __mul__(self, other):
         if isinstance(other, DualNumber):
@@ -242,32 +272,9 @@ class DualNumber:
             return DualNumber(self.real * other, self.dual * other)
     __rmul__ = __mul__
 
-    def __truediv__(self, other):
-        if isinstance(other, DualNumber):
-            return DualNumber(self.real/other.real,
-                              (self.dual*other.real - self.real*other.dual)/(other.real**2))
-        else:
-            return (1/other) * self
-
-    def __floordiv__(self, other):
-        if isinstance(other, DualNumber):
-            return DualNumber(self.real/other.real,
-                                (self.dual*other.real - self.real*other.dual)/(other.real**2))
-        else:
-            return (1/other) * self
-
-    def __rtruediv__(self, other):
-        return DualNumber(other, 0).__truediv__(self)
-
-    def __rfloordiv__(self, other):
-        return DualNumber(other, 0).__floordiv__(self)
-
     def __pow__(self, other):
         return DualNumber(self.real**other,
                           self.dual * other * self.real**(other - 1))
-
-    def __repr__(self):
-        return repr(self.real) + ' + ' + repr(self.dual) + '*epsilon'
 
 def auto_diff(f, x):
     return f(DualNumber(x, 1.)).dual
@@ -279,7 +286,7 @@ def forward_diff():
     h = cost_parameters["holding_cost_percentage"]
     o = cost_parameters["order_cost"]
     d = demand_parameters["yearly_demand"]
-    f = auto_diff(lambda x: d/x*o+x/2*h*p, 17 )
+    f = auto_diff(lambda x: (1-x)**2+5*(10-x**2)**2, 1)
     print(f)
 
 ##########################################
@@ -298,16 +305,90 @@ def reverse_diff():
     f = reverse_autodiff(d/x*o+x/2*h*p, x)
     print(f)
 
+
+##########################################
+#Adjusted RMSE error#
+##########################################
+
+def rmse_adjusted_2():
+    df = pd.read_excel("C:\\Users\\s.pauly\\Documents\\Business Cases\\Autonet\\Covariance4.xlsx")
+    def autocv(df):
+        autocovariances = []
+        variance_sum = []
+        df = df.iloc[:,1:]
+        for i in range(len(df)):
+            x = np.array(df.iloc[i,:])
+            autocov_matrix = sm.tsa.stattools.acovf(x)
+            autocov_sum = autocov_matrix[1:].sum()
+            autocovariances.append(autocov_sum)
+            sum_variance = np.std(x)**2*len(df.columns)
+            variance_sum.append(sum_variance)
+        return autocovariances,variance_sum
+    df['covariance_correction'],df['variance_sum']= autocv(df)
+    df['corrected_sum'] = df['variance_sum']+2*df['covariance_correction']
+    df['normal_rmse'] = np.sqrt(df['variance_sum']/len(df.iloc[:,1:-3].columns))
+    df['adjusted_rmse'] = np.sqrt(df['corrected_sum']/len(df.iloc[:,1:-4].columns))
+    print(df)
+
+##########################################
+#calculating impact centralization#
+##########################################
+
+def rmse_adjusted():
+    df = pd.read_excel("C:\\Users\\s.pauly\\Documents\\Business Cases\\Autonet\\Covariance4.xlsx")
+    df = df.iloc[:,1:]
+    data = np.array(df)
+    covMatrix = np.cov(data,bias=True)
+    # centralized_variance = sum(sum(covMatrix))
+    # decentralized_variance = sum(np.diagonal(covMatrix))
+    decentralized_ss = sum(np.sqrt(np.diagonal(covMatrix)))
+    centralized_ss = np.sqrt(sum(sum(covMatrix)))
+    difference_in_ss = decentralized_ss-centralized_ss
+    print(difference_in_ss)
+
+
+
 ##########################################
 #Simulated Annealing#
-##Auchkley function##
+##Ackley function##
 ##########################################
+
+def simulated_annealing_example():
+    a = 20
+    b = 0.2
+    c = 2 * np.pi
+    f = lambda x: (1.5-x[0]+x[0]*x[1])**2+(2.25-x[0]+x[0]*x[1]**2)**2+(2.625-x[0]+x[0]*x[1]**3)**2
+    # ackley: a + np.exp(1) -a * np.exp(-b * np.sqrt(x[0]*x[0] + x[1]*x[1]) / 2) -np.exp((np.cos(c*x[0]) + np.cos(c*x[1]))/2)
+    # Beale : (1.5-x[0]+x[0]*x[1])**2+(2.25-x[0]+x[0]*x[1]**2)**2+(2.625-x[0]+x[0]*x[1]**3)**2
+    # 3*(1-x[0])**2*math.exp(-x[0]**2-(x[1]+1)**2)-10*(x[0]/5-x[0]**3-x[1]**5)*math.exp(-x[0]**2-x[1]**2)-1/3*math.exp(-(x[0]+1)**2-x[1]**2)
+    # f = lambda x: (a-x[0])**2+b*(x[1]-x[0]**2)**2
+    solution = simulated_annealing(f, [-2,2], 2, 100, 100000, .99)
+    for i in range(len(solution)):
+        print("x"+str(i)+"=", solution[i])
+
+def simulated_annealing(f, x, T, t, k_max, gamma):
+    r = len(x)
+    y = f(x)
+    x_best, y_best = x, y
+    for i in range(k_max):
+        p = [random.uniform(-T, T) for i in range(r)] 
+        x_prime = [x + y for x, y in zip(x, p)]
+        y_prime = f(x_prime)
+        y_delta = y_prime-y
+        if y_delta <= 0 or np.random.rand() < math.exp(-y_delta/t):
+            x, y = x_prime, y_prime
+        if y_prime<y_best:
+            x_best, y_best = x_prime, y_prime
+        t *= gamma
+    return x_best
 
 
 ##########################################
 #Point iteration algorithm#
 ##Nonstocked decision function##
 ##########################################
+
+
 
 ##########################################
 #Cuckoo Search#
