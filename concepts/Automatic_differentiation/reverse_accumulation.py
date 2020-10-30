@@ -3,6 +3,7 @@ class Overloader:
     def __init__(self, value):
         self.value = value
         self.children = []
+        self.parents = []
         self.grad_value = None
     
     def _reverse_autodiff(self):
@@ -16,6 +17,7 @@ class Overloader:
     def __add__(self, other):
         z = Overloader(self.value + other.value)
         self.children.append((1.0, z))
+        other.children.append((1.0, z))
         return z
 
     def __mul__(self, other):
@@ -26,7 +28,10 @@ class Overloader:
     def __truediv__(self, other):
         other = other if isinstance(other, Overloader) else Overloader(other)
         z = Overloader(self.value / other.value)
-        other.children.append((-self.value / other.value**2, z))
+        partial_z_wrt_self = 1 / other.value
+        partial_z_wrt_other = -self.value / other.value**2
+        self.children.append((partial_z_wrt_self, z))
+        other.children.append((partial_z_wrt_other, z))
         return z
 
     def __rtruediv__(self, other):

@@ -1,13 +1,16 @@
 from config import get_config
 from concepts.Automatic_differentiation.reverse_accumulation import reverse_autodiff, Overloader
+from concepts.Gradient_boosting.regression_tree import prepare_dataset
 import autograd.numpy as numpy
 from autograd import grad
 import numpy as np
+from numpy import log, exp, pi
 import pandas as pd
 import random
 import math
 import scipy.stats as st
-from scipy.stats import poisson
+from scipy.special import gamma
+from scipy.stats import poisson, cauchy, norm, uniform
 import statsmodels.api as sm
 import sympy
 from sympy import Symbol, diff
@@ -209,7 +212,7 @@ def accept_proposal(mean_proposal, std_proposal, mean_current, std_current, prio
     likelihood_proposal = likelihood(mean_proposal, std_proposal, data)
     return (prior_proposal + likelihood_proposal) - (prior_current + likelihood_current)
 
-def get_trace(data, samples = 5000):
+def get_trace(data, samples = 500):
     mean_prior = 5
     std_prior = 5
     mean_current = mean_prior
@@ -233,11 +236,102 @@ def get_trace(data, samples = 5000):
 def metropolis_hasting_example():
     meanX = 1.5
     stdX = 1.2
-    X = np.random.normal(meanX, stdX, size = 1000)
+    X = np.random.normal(meanX, stdX, size = 100)
     trace = get_trace(X)
     mean = np.mean(trace['mean'])
     std = np.mean(trace['std'])
     print(mean, std)
+
+
+##########################################
+#Metropolis-Hastings algorithm#
+##http://www.mit.edu/~ilkery/papers/MetropolisHastingsSampling.pdf##
+##########################################
+def get_trace1(x, y, samples = 10000):
+    rho = 0
+    # Store the samples
+    chain_rho=numpy.array([0.]*samples)
+    p_current = rho
+    N = 1000
+    proposal_width = 0.07
+    for i in range(samples):
+        rho_proposal  = np.random.uniform(p_current-proposal_width ,p_current+proposal_width)
+        # Compute the acceptance probability, Equation 8 and Equation 6. 
+        # We will do both equations in log domain here to avoid underflow.
+        accept = -3./2*log(1.-rho_proposal**2) - N*log((1.-rho_proposal**2)**(1./2)) - sum(1./(2.*(1.-rho_proposal**2))*(x**2-2.*rho_proposal*x*y+y**2))
+        accept = accept-(-3./2*log(1.-p_current**2) - N*log((1.-p_current**2)**(1./2)) - sum(1./(2.*(1.-p_current**2))*(x**2-2.*p_current*x*y+y**2)))
+        accept = min([1,accept])
+        accept = exp(accept)
+        if uniform.rvs(0,1) < accept:
+            p_current = rho_proposal
+        chain_rho[i]=p_current
+    return chain_rho
+
+def metropolis_hasting_example2():
+    N=1000
+    data=np.random.multivariate_normal([0,0],[[1, 0.4],[0.4, 1]],N)
+    x=data[:,0]
+    y=data[:,1]
+    trace = get_trace1(x, y)
+    f, (ax1,ax2,ax3)=plt.subplots(3,1)
+    # Plot the data
+    ax1.scatter(x,y,s=20,c='b',marker='o')
+    # plot things
+    ax2.plot(trace,'b')
+    ax2.set_ylabel('$rho$')
+    ax3.hist(trace,50)
+    ax3.set_xlabel('$rho$')
+
+    plt.show()
+
+##########################################
+#Metropolis-Hastings algorithm#
+##geometric distributed demand and looking for the distribution of beta##
+##pagina 82 Axsäter##
+
+# wanneer we de formule op p 82 van axsater toepassen dan moeten we veel data hebben#
+#bv bij N = 1000, dan zitten we er heel kort bij#
+# maar bij N = 100, is beta rond de 0,20-0,25#
+# met het algoritme kunnen we direct zien dat het gemiddelde 0,35 is en zien we zelfs een distributie ervan#
+# hoe groter de sample, hoe kleiner de afwijking en hoe zekerder dat we zijn#
+# dit is niet alleen heel handig bij het bepalen van het order level bij weinig transacties,
+# maar ook outlier detection wanneer er weinig transacties zijn#
+##########################################
+def get_trace2(x, samples = 10000):
+    beta = 0.0
+    # Store the samples
+    beta_chain = numpy.array([0.]*samples)
+    beta_current = beta
+    N = 100
+    granularity = 100
+    proposal_width = 0.07
+    for i in range(samples):
+        beta_proposal  = np.random.uniform(beta_current-proposal_width ,beta_current+proposal_width)
+        # Compute the acceptance probability.
+        # We will do both equations in log domain here to avoid underflow.
+        accept = -log(granularity)+(N*log(beta_proposal)+sum(x-1)*log(1-beta_proposal))
+        accept = accept-((-log(granularity))+(N*log(beta_current)+sum(x-1)*log(1-beta_current)))
+        accept = min([1,accept])
+        accept = exp(accept)
+        if uniform.rvs(0,1) < accept:
+            beta_current = beta_proposal
+        beta_chain[i]=beta_current
+    return beta_chain
+
+def metropolis_hasting_example3():
+    N=100
+    data=np.random.geometric(0.35,N)
+    x = data
+    axsater_beta = 1-(2/(1+data.var()/data.mean()))
+    trace = get_trace2(x)
+    f, (ax1,ax2,ax3)=plt.subplots(3,1)
+    # plot things
+    ax2.plot(trace,'b')
+    ax2.set_ylabel('$beta$')
+    ax3.hist(trace, 50)
+    ax3.set_xlabel('$beta$')
+
+    plt.show()
 
 ##########################################
 #Automatic differentiation- forward accumulation#
@@ -301,7 +395,7 @@ def reverse_diff():
     h = cost_parameters["holding_cost_percentage"]
     o = cost_parameters["order_cost"]
     d = demand_parameters["yearly_demand"]
-    x = Overloader(17)
+    x = Overloader(245)
     f = reverse_autodiff(d/x*o+x/2*h*p, x)
     print(f)
 
@@ -388,9 +482,92 @@ def simulated_annealing(f, x, T, t, k_max, gamma):
 ##Nonstocked decision function##
 ##########################################
 
+def fixed_point_iteration():
+    mu = 1000
+    h = 10
+    s = 2.05
+    T = 1
+    Q = 10
+    o = 15
+    f = lambda x: x*(norm.ppf(1-(Q*h)/(x*mu)) *s*math.sqrt(T)*h+math.sqrt(2*mu*o*h))/(mu*x-h*Q)
+    solution = point_iteration(f)
+    print("the margin boundary is", solution, "€")
 
+def point_iteration(f, k_max = 100, start = 50):
+    m = start
+    counter = 0
+    while counter <= k_max:
+        g_M = f(m)
+        m = g_M
+        counter += 1
+    return m
 
 ##########################################
 #Cuckoo Search#
-##Nonstocked decision function##
+##########################################
+
+def cuckoo_search_example():
+    factor = lambda x: ((gamma(1+x)*math.sin(math.pi*x*0.5))/(gamma((1+x)/2)*x*2**((x-1)/2)))**(1/x)
+    f = lambda x: (1.5-x[0]+x[0]*x[1])**2+(2.25-x[0]+x[0]*x[1]**2)**2+(2.625-x[0]+x[0]*x[1]**3)**2
+    solution, min_value = cuckoo_search(f, factor)
+    for i in range(len(solution)):
+        print("x"+str(i)+"=", solution[i])
+
+def cuckoo_search(f, factor, range_x = [-4.5, 4.5], population=50, d=0.01, beta = 1.5, p_a = 0.25, k_max = 10000, dimensions = 2):
+    # Initialize an initial nest.
+    initial_nest = np.random.rand(population, dimensions)*(range_x[1]-(range_x[0]))+range_x[0]
+    # Calculate factor sigma_u.
+    sigma_u = factor(beta)
+    counter = 0
+    while counter <=k_max:
+        if counter == 0:
+            nest = initial_nest
+            values  = [f(initial_nest[egg]) for egg in range(len(initial_nest))]
+        best_egg = nest[values.index(min(values))]
+        # Calculate u, v and s.
+        for i in range(len(nest)):
+            u = np.random.normal(0,sigma_u, dimensions)
+            v = np.random.normal(0,1, dimensions)
+            s = u/(abs(v)**(1/beta))
+            new_values = []
+            # Calculate new solutions/eggs with the lévy flight.
+            for j in range(dimensions):
+                x_new = nest[i, j]+ np.random.standard_cauchy()*d*s[j]*(nest[i, j]-best_egg[j])
+                new_values.append(x_new)
+            new_objective_value = f(new_values)
+            # If new objective value of new egg is lower than the current egg, replace it in the nest.
+            if new_objective_value < values[i]:
+                values[i]=new_objective_value
+                nest[i]=new_values  
+            new_values_2= []
+            r = np.random.rand(dimensions)
+            d_1 = random.uniform(1, population)
+            d_2 = random.uniform(1, population)
+            for j in range(dimensions):
+                if r[j] < p_a:
+                    # random.rand() is a uniform distribution. This is so much worse than a gauchy!
+                    x_new = nest[i, j]+ np.random.standard_cauchy()*(nest[int(d_1), j]-nest[int(d_2), j])
+                    new_values_2.append(x_new)
+                else:
+                    x_new = nest[i, j]
+                    new_values_2.append(x_new)
+            new_objective_value = f(new_values_2)
+            if new_objective_value < values[i]:
+                values[i]=new_objective_value
+                nest[i]=new_values
+        print(min(values))
+        counter += 1
+    return nest[values.index(min(values))], min(values)
+
+
+##########################################
+#Gradient Boosting Algorithm#
+##########################################
+
+def gradient_boosting_example():
+    X_train, y_train, X_test, y_test = prepare_dataset()
+    pass
+
+##########################################
+#Reinforcement Learning#
 ##########################################

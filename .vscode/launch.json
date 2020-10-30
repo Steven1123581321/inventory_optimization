@@ -41,6 +41,22 @@
         "args": ["metropolis_hasting_example"]
     },
     {
+        "name": "metropolis_hasting_example2",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["metropolis_hasting_example2"]
+    },
+    {
+        "name": "metropolis_hasting_example3",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["metropolis_hasting_example3"]
+    },
+    {
         "name": "diff2",
         "type": "python",
         "request": "launch",
@@ -71,6 +87,30 @@
         "program": "${workspaceFolder}/main.py",
         "console": "integratedTerminal",
         "args": ["rmse"]
+    },
+    {
+        "name": "cuckoo",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["cuckoo"]
+    },
+    {
+        "name": "point_iteration",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["point_iteration"]
+    },
+    {
+        "name": "gradient_boosting",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["gradient_boosting"]
     }
 ]
 }

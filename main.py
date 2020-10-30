@@ -11,7 +11,12 @@ from commands import (
     metropolis_hasting_example,
     adam_example,
     simulated_annealing_example,
-    rmse_adjusted
+    rmse_adjusted,
+    cuckoo_search_example,
+    fixed_point_iteration,
+    gradient_boosting_example,
+    metropolis_hasting_example2,
+    metropolis_hasting_example3
 )
 from ttictoc import TicToc
 from config import set_config
@@ -31,7 +36,12 @@ def main():
         'metropolis_hasting_example':metropolis_hasting_example,
         'adam': adam_example,
         'annealing': simulated_annealing_example,
-        'rmse': rmse_adjusted
+        'rmse': rmse_adjusted,
+        'cuckoo': cuckoo_search_example,
+        'point_iteration': fixed_point_iteration,
+        'gradient_boosting': gradient_boosting_example,
+        'metropolis_hasting_example2':metropolis_hasting_example2,
+        'metropolis_hasting_example3':metropolis_hasting_example3
     }
 
     # Select what to do based on input arguments
