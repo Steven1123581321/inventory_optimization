@@ -57,6 +57,14 @@
         "args": ["metropolis_hasting_example3"]
     },
     {
+        "name": "metropolis_hasting_example4",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["metropolis_hasting_example4"]
+    },
+    {
         "name": "diff2",
         "type": "python",
         "request": "launch",
@@ -111,6 +119,38 @@
         "program": "${workspaceFolder}/main.py",
         "console": "integratedTerminal",
         "args": ["gradient_boosting"]
+    },
+    {
+        "name": "nonlinear",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["nonlinear"]
+    },
+    {
+        "name": "question",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["question"]
+    },
+    {
+        "name": "bayesian",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["bayesian"]
+    },
+    {
+        "name": "simple_search_example",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/main.py",
+        "console": "integratedTerminal",
+        "args": ["simple_search_example"]
     }
 ]
 }

@@ -1,7 +1,17 @@
 from config import get_config
+import sys
+from warnings import catch_warnings
+from warnings import simplefilter
+from collections import defaultdict
 from concepts.Automatic_differentiation.reverse_accumulation import reverse_autodiff, Overloader
-from concepts.Gradient_boosting.regression_tree import prepare_dataset
+from concepts.interview.question_class import Graph
+from concepts.Gradient_boosting.regression_tree import regression_tree
+from sklearn.datasets import load_boston
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.tree import DecisionTreeRegressor
 import autograd.numpy as numpy
+import time
 from autograd import grad
 import numpy as np
 from numpy import log, exp, pi
@@ -15,6 +25,8 @@ import statsmodels.api as sm
 import sympy
 from sympy import Symbol, diff
 import matplotlib.pyplot as plt
+from pyomo.environ import *
+from pyomo.opt import SolverFactory
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -296,21 +308,21 @@ def metropolis_hasting_example2():
 # hoe groter de sample, hoe kleiner de afwijking en hoe zekerder dat we zijn#
 # dit is niet alleen heel handig bij het bepalen van het order level bij weinig transacties,
 # maar ook outlier detection wanneer er weinig transacties zijn#
+
+
+##FORMULES: zie rode boekje en document MHAforbook.docx!!!#####
 ##########################################
-def get_trace2(x, samples = 10000):
-    beta = 0.0
+def get_trace2(x, start=0.01, N = 100, samples = 100000):
+    beta = start
     # Store the samples
     beta_chain = numpy.array([0.]*samples)
     beta_current = beta
-    N = 100
-    granularity = 100
-    proposal_width = 0.07
     for i in range(samples):
-        beta_proposal  = np.random.uniform(beta_current-proposal_width ,beta_current+proposal_width)
+        beta_proposal  = np.random.uniform(0.01 , 0.99)
         # Compute the acceptance probability.
         # We will do both equations in log domain here to avoid underflow.
-        accept = -log(granularity)+(N*log(beta_proposal)+sum(x-1)*log(1-beta_proposal))
-        accept = accept-((-log(granularity))+(N*log(beta_current)+sum(x-1)*log(1-beta_current)))
+        accept = (N*log(beta_proposal)+sum(x-1)*log(1-beta_proposal))
+        accept = accept-(N*log(beta_current)+sum(x-1)*log(1-beta_current))
         accept = min([1,accept])
         accept = exp(accept)
         if uniform.rvs(0,1) < accept:
@@ -320,17 +332,16 @@ def get_trace2(x, samples = 10000):
 
 def metropolis_hasting_example3():
     N=100
-    data=np.random.geometric(0.35,N)
+    data=np.random.geometric(0.60,N)
     x = data
-    axsater_beta = 1-(2/(1+data.var()/data.mean()))
+    beta_from_mean = 1/x.mean()
     trace = get_trace2(x)
-    f, (ax1,ax2,ax3)=plt.subplots(3,1)
+    f, (ax1,ax2)=plt.subplots(2,1)
     # plot things
-    ax2.plot(trace,'b')
-    ax2.set_ylabel('$beta$')
-    ax3.hist(trace, 50)
-    ax3.set_xlabel('$beta$')
-
+    ax1.plot(trace,'b')
+    ax1.set_ylabel('$beta$')
+    ax2.hist(trace, 50)
+    ax2.set_xlabel('$beta$')
     plt.show()
 
 ##########################################
@@ -439,8 +450,6 @@ def rmse_adjusted():
     centralized_ss = np.sqrt(sum(sum(covMatrix)))
     difference_in_ss = decentralized_ss-centralized_ss
     print(difference_in_ss)
-
-
 
 ##########################################
 #Simulated Annealing#
@@ -559,15 +568,363 @@ def cuckoo_search(f, factor, range_x = [-4.5, 4.5], population=50, d=0.01, beta 
         counter += 1
     return nest[values.index(min(values))], min(values)
 
-
 ##########################################
 #Gradient Boosting Algorithm#
 ##########################################
 
 def gradient_boosting_example():
-    X_train, y_train, X_test, y_test = prepare_dataset()
-    pass
+    tree = regression_tree()
+    tree.load('boston')
+    tree.prepare_dataset()
+    M = 10
+    learning_rate = 0.10
+    f_0 = np.mean(tree.y_train)
+    output_data = pd.DataFrame(tree.y_train)
+    input_data = pd.DataFrame(tree.X_train)
+    output_data['f_x'] = f_0
+    for i in range(M):
+        # Put the derivative as a new output column.
+        output_data['r_im']  = output_data['House Price']-output_data['f_x']
+        # best_variable_split = tree.split(input_data, output_data['r_im'])
+        decision_tree = DecisionTreeRegressor()
+        decision_tree.fit(input_data, output_data['r_im'])
+        output_data['R_jm'] = decision_tree.apply(input_data)
+        leafs = output_data['R_jm'].unique().tolist()
+        output_data['gamma_jm'] = 0.
+        for leaf in leafs:
+            array = output_data['House Price'].loc[output_data['R_jm']==leaf]
+            average = np.mean(array)
+            output_data['gamma_jm'] = np.where(output_data['R_jm']==leaf, average, output_data['gamma_jm'])
+        output_data['update_value'] = output_data['gamma_jm'] - output_data['f_x']
+        output_data['f_x'] = output_data['f_x'] + learning_rate*output_data['update_value']
+        output_data = output_data[['House Price', 'f_x']]
+    return output_data['f_x']
+
+def gradient_boosting_quantile_regression_example():
+    tree = regression_tree()
+    tree.load('boston')
+    tree.prepare_dataset()
+    M = 100
+    Quantile = 0.75
+    learning_rate = 0.01
+    f_0 = np.quantile(tree.y_train, Quantile)
+    output_data = pd.DataFrame(tree.y_train)
+    input_data = pd.DataFrame(tree.X_train)
+    output_data['f_x'] = f_0
+    decision_trees = []
+    for i in range(M):
+        # Put the derivative as a new output column.
+        output_data['r_im']  = -((output_data['House Price']-output_data['f_x'] < 0) - Quantile)
+        # best_variable_split = tree.split(input_data, output_data['r_im'])
+        decision_tree = DecisionTreeRegressor()
+        decision_tree.fit(input_data, output_data['r_im'])
+        decision_trees.append(decision_tree)
+        output_data['R_jm'] = decision_tree.apply(input_data)
+        leafs = output_data['R_jm'].unique().tolist()
+        output_data['gamma_jm'] = f_0
+        for leaf in leafs:
+            array = output_data['House Price'].loc[output_data['R_jm']==leaf]
+            inverse_quantile = np.quantile(array, Quantile)
+            output_data['gamma_jm'] = np.where(output_data['R_jm']==leaf, inverse_quantile, output_data['gamma_jm'])
+        output_data['update_value'] = output_data['gamma_jm'] - output_data['f_x']
+        output_data['f_x'] = output_data['f_x'] + learning_rate*output_data['update_value']
+        output_data = output_data[['House Price', 'f_x']]
+    def gradient_boost_mse_predict(regressors, f0, X, learning_rate):
+        y_hat = np.array([f0]*len(X)) 
+        for regressor in regressors: 
+            y_hat += learning_rate * regressor.predict(X)
+        return y_hat
+    y_hat = gradient_boost_mse_predict(decision_trees, f0=f_0, X = tree.X_test, learning_rate = learning_rate)
+    truth = tree.y_test
+    # truth = tree.y_train
+    # y_hat = output_data['f_x'].values
+    correct = 0.
+    for i, val in enumerate(truth):
+        if val <= y_hat[i]:
+            correct += 1
+    print(correct/len(truth))
+    return output_data['f_x']
 
 ##########################################
-#Reinforcement Learning#
+#Simple search algorithm for Smoothing constant#
 ##########################################
+
+def mean_squared_error(observations, predictions):
+    squared_error = (observations-predictions)**2
+    return np.mean(squared_error)
+
+def search(data, start=0.5, samples = 20, starting_value=None):
+    # Store the samples
+    data = pd.DataFrame(data)
+    alpha_chain = numpy.array([0.]*samples)
+    alpha_current = start
+    proposal_width = 0.111111111111
+    error_current = np.sum(data**2)
+    error_current = error_current.values[0]
+    for i in range(samples):
+        alpha_proposal  = np.random.uniform(alpha_current-proposal_width ,alpha_current+proposal_width)
+        if alpha_proposal >1.:
+            alpha_proposal = 1.
+        elif alpha_proposal < 0.:
+            alpha_proposal = 0.
+        else:
+            alpha_proposal = alpha_proposal
+        # Compute the acceptance probability.
+        x = []
+        prediction = starting_value
+        x.append(prediction)
+        for j in range(len(data)-1):
+            prediction = data.iloc[j,:]*alpha_proposal + (1-alpha_proposal)*prediction
+            x.append(prediction.values[0])
+        data['predictions'] = x
+        error_proposal = mean_squared_error(data['Demand'], data['predictions'])
+        accept = error_proposal/error_current
+        accept = min([1,accept])
+        if 1 > accept:
+            alpha_current = alpha_proposal
+            error_current = error_proposal
+        alpha_chain[i]=alpha_current
+    return alpha_chain
+
+def simple_search_example():
+    dataset = pd.read_excel("./output/Book1.xlsx")
+    data = dataset['Demand']
+    N = 100
+    startTime = time.time()
+    starting_value = np.mean(data[:-N])
+    data = data[-N:]
+    trace = search(data, starting_value=starting_value)
+    elapsedTime = time.time() - startTime
+    print(trace[-1], elapsedTime)
+
+##################################################
+#Non-linear optimization for SL-differentiation#
+#################################################
+def nonlinear_example():
+    dataset = pd.read_excel("./output/SLdifferentiation.xlsx")
+    target_group = 0.95
+    T = target_group
+    N = list(dataset['Item'])
+    s = dict(zip(dataset.Period,dataset.s))# sigma prime
+    Q = dict(zip(dataset.Period,dataset.Q)) # order quantity
+    D = dict(zip(dataset.Period,dataset.D)) # yearly demand
+    h = dict(zip(dataset.Period,dataset.h)) # unit price times holding cost percentage
+    model = ConcreteModel(name="SL diff")
+    model.x = Var(N, bounds=(0.85,1)) # z-value
+
+    def obj_rule(model):
+        return sum((4.85-(((Q[n]*(1-model.x[n]))/s[n])**1.3)*0.3924-(((Q[n]*(1-model.x[n]))/s[n])**0.135)*5.359)*h[n]*s[n] for n in N)
+    model.obj = Objective(rule=obj_rule, sense=minimize)
+
+    def group_service_level(model):
+        return sum(D[n]*model.x[n] for n in N)/(sum(D[n] for n in N)) == T
+    model.group_service_level = Constraint(rule=group_service_level)
+    solver = SolverFactory('ipopt')
+    solver.solve(model, tee=True)
+    # print
+    model.x.pprint()
+    # or to dataframe with only the solution values per item.
+    x = []
+    for key in model.x:
+        x.append(value(model.x[key]))
+    dataset['optimal'] = pd.DataFrame(x)
+
+
+##########################################
+#Metropolis-Hastings algorithm#
+##deviation voor lost sales omgevingen##
+##########################################
+def get_trace3(samples = 100, average=None, deviation=None, fill_rate=None, Q=None, order_level=None):
+    average_current = average
+    deviation_current = deviation
+    order_level = order_level
+    fill_rate = fill_rate
+    Q = Q
+    expected_bo_per_cycle = Q*(1-fill_rate)
+    # Store the samples
+    chain = numpy.array([0.]*samples)
+    accept = np.inf
+    proposal_width = 1.
+    for i in range(samples):
+        deviation_proposal = max(1,np.random.uniform(deviation_current-proposal_width ,deviation_current+proposal_width))
+        current = (average-order_level)*(1-norm.cdf((order_level-average)/deviation_current, 0, 1))+deviation_current*norm.pdf((order_level-average)/deviation_current, 0, 1)
+        proposal = (average-order_level)*(1-norm.cdf((order_level-average)/deviation_proposal, 0, 1))+deviation_proposal*norm.pdf((order_level-average)/deviation_proposal, 0, 1)
+        accept_current = abs(current-expected_bo_per_cycle)
+        accept_proposal = abs(proposal-expected_bo_per_cycle)
+        if accept_proposal < accept_current:
+            deviation_current = deviation_proposal
+    return deviation_current
+
+def metropolis_hasting_example4():
+    average = 50
+    deviation = 25
+    fill_rate = 0.93
+    order_level = 62
+    Q = 100
+    deviation = get_trace3(average=average, deviation=deviation, fill_rate=fill_rate, Q=Q, order_level=order_level)
+    print(deviation)
+
+##########################################
+#Interview Question##
+##########################################
+
+def question():
+    shops = [
+    "BGI", "CDG", "DEL", "DOH", "DSM", "EWR", "EYW", "HND", "ICN",
+    "JFK", "LGA", "LHR", "ORD", "SAN", "SFO", "SIN", "TLV", "BUD"
+    ]
+
+    routes = [
+        ["DSM", "ORD"],
+        ["ORD", "BGI"],
+        ["BGI", "LGA"],
+        ["SIN", "CDG"],
+        ["CDG", "SIN"],
+        ["CDG", "BUD"],
+        ["DEL", "DOH"],
+        ["DEL", "CDG"],
+        ["TLV", "DEL"],
+        ["EWR", "HND"],
+        ["HND", "ICN"],
+        ["HND", "JFK"],
+        ["ICN", "JFK"],
+        ["JFK", "LGA"],
+        ["EYW", "LHR"],
+        ["LHR", "SFO"],
+        ["SFO", "SAN"],
+        ["SFO", "DSM"],
+        ["SAN", "EYW"]
+    ]
+
+    startingShop = "LGA"
+
+    # Possible Solution (Steven P)
+
+    temp = defaultdict(lambda: len(temp)) 
+    res = [temp[ele] for ele in shops]
+    zipbObj = zip(shops, res)
+    dictOfWords = dict(zipbObj)
+    for i in range(len(routes)):
+        for j in range(len(routes[i])):
+            routes[i][j] = dictOfWords.get(routes[i][j])
+    V = len(shops)
+    graph = Graph(V)
+    for i in range(len(routes)):
+        graph.add_edge(routes[i][0],routes[i][1])
+    graph.get_scc()
+    strong_components_dictionary = graph.dictionary_sc
+    list_strong_components = list(strong_components_dictionary.keys())
+    list_strong_components_members = list(strong_components_dictionary.values())
+    list_of_members = [item for sublist in list_strong_components_members for item in sublist]
+    # Now we got the strong components and their representatives and members.
+    # We now have to make a new new adjency list. 
+    # From this we can find the indegrees zero's.
+    for i in range(len(routes)):
+        if routes[i][0] in list_of_members:
+            for j in range(len(list_strong_components_members)):
+                if routes[i][0] in list_strong_components_members[j]:
+                    x = j
+                    routes[i][0] = list_strong_components[x]
+                else: continue
+        else:
+            continue
+    for i in range(len(routes)):
+        if routes[i][1] in list_of_members:
+            for j in range(len(list_strong_components_members)):
+                if routes[i][1] in list_strong_components_members[j]:
+                    x = j
+                    routes[i][1] = list_strong_components[x]
+                else: continue
+        else:
+            continue
+    graph = Graph(V)
+    for i in range(len(routes)):
+        graph.add_edge(routes[i][0],routes[i][1])
+    # Now loop over the dictionaries keys and remove all the values in the dict.values that are the same as the key. this leaves you the compressed direct graph.
+    for key, value in graph.graph.items():
+        while key in value:
+            x = key
+            value.remove(x)
+    my_map = dict(graph.graph)
+    l = list(my_map.values())
+    flat_list = [item for sublist in l for item in sublist]
+    # Now only add the "list_of_members" to the flat list and check which numbers are not in the list (5,6 and 16) or just count them!
+    list_positive_indegrees = [] 
+    [list_positive_indegrees.append(x) for x in (flat_list+list_of_members) if x not in list_positive_indegrees]
+    list_positive_indegrees.sort()
+    solution = len(shops)-len(list_positive_indegrees)
+    list_positive_indegrees_shops = [k for k, v in dictOfWords.items() if v in set(list_positive_indegrees)]
+    solution_shops = list(set(shops) - set(list_positive_indegrees_shops))
+    print ("The shops that need an extra connection from shop LGA are : " + str(solution_shops)[1:-1])
+
+##################################################
+#smoothing constant via bayesian optimization##
+#################################################
+
+def mean_squared_error(observations, predictions):
+    squared_error = (observations-predictions)**2
+    return np.mean(squared_error)
+
+def bayesian(data, samples = 5, starting_value=None):
+    data = pd.DataFrame(data)
+    def sampler(samples=None, data=None):
+        errors = []
+        for sample in samples:
+            x = [starting_value]
+            prediction = starting_value
+            for j in range(len(data)-1):
+                prediction = data.iloc[j, :]*sample + (1-sample)*prediction
+                x.append(prediction.values[0])
+            data['predictions'] = x
+            error = mean_squared_error(data['Demand'].values, data['predictions'].values)
+            errors.append(error)
+            data = data[['Demand']]
+        return errors, samples
+    def surrogate(model, X):
+    	# catch any warning generated when making a prediction
+        with catch_warnings():
+            # ignore generated warnings
+            simplefilter("ignore")
+            return model.predict(X)
+    def opt_acquisition(X, y, model):
+    	# random search, generate random samples
+        Xsamples = np.array([round(np.random.rand(),2) for i in range(10)]).reshape(-1 ,1)
+        # calculate the acquisition function for each sample
+        scores = acquisition(X, Xsamples, model)
+        # locate the index of the largest scores
+        ix = np.argmin(scores)
+        return Xsamples[ix, 0]
+    # probability of improvement acquisition function
+    def acquisition(X, Xsamples, model):
+        # calculate the best surrogate score found so far
+        yhat = surrogate(model, X)
+        best = min(yhat)
+        # calculate mean and stdev via surrogate function
+        sample_output = surrogate(model, Xsamples)
+        # calculate the probability of improvement
+        scores = sample_output-best
+        return scores
+    samples = [round(np.random.rand(),2) for i in range(5)]
+    errors, samples = sampler(samples=samples, data=data)
+    model = GaussianProcessRegressor()
+    model.fit(np.array(samples).reshape(-1, 1), np.array(errors))
+    for i in range(50):
+        # select the next point to sample
+        x = opt_acquisition(np.array(samples).reshape(-1, 1), np.array(errors), model)
+        actual_error, x = sampler(samples= [x], data=data)
+        samples.extend(x)
+        errors.extend(actual_error)
+        model.fit(np.array(samples).reshape(-1, 1), np.array(errors))
+    ix = np.argmin(np.array(errors))
+    return np.array(samples).reshape(-1, 1)[ix], np.array(errors)[ix]
+
+def bayesian_optimization():
+    dataset = pd.read_excel("./output/Book1.xlsx")
+    data = dataset['Demand']
+    N = 100
+    startTime = time.time()
+    starting_value = np.mean(data[:-N])
+    data = data[-N:]
+    optimal_value, lowest_cost = bayesian(data, starting_value=starting_value)
+    elapsedTime = time.time() - startTime
+    print(optimal_value, elapsedTime)

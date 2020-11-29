@@ -14,9 +14,14 @@ from commands import (
     rmse_adjusted,
     cuckoo_search_example,
     fixed_point_iteration,
-    gradient_boosting_example,
+    gradient_boosting_quantile_regression_example,
     metropolis_hasting_example2,
-    metropolis_hasting_example3
+    metropolis_hasting_example3,
+    metropolis_hasting_example4,
+    simple_search_example,
+    nonlinear_example,
+    question,
+    bayesian_optimization
 )
 from ttictoc import TicToc
 from config import set_config
@@ -39,9 +44,14 @@ def main():
         'rmse': rmse_adjusted,
         'cuckoo': cuckoo_search_example,
         'point_iteration': fixed_point_iteration,
-        'gradient_boosting': gradient_boosting_example,
+        'gradient_boosting': gradient_boosting_quantile_regression_example,
         'metropolis_hasting_example2':metropolis_hasting_example2,
-        'metropolis_hasting_example3':metropolis_hasting_example3
+        'metropolis_hasting_example3':metropolis_hasting_example3,
+        'metropolis_hasting_example4': metropolis_hasting_example4,
+        'simple_search_example':simple_search_example,
+        'nonlinear': nonlinear_example,
+        'question': question,
+        'bayesian': bayesian_optimization
     }
 
     # Select what to do based on input arguments
