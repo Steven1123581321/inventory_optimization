@@ -21,7 +21,8 @@ from commands import (
     simple_search_example,
     nonlinear_example,
     question,
-    bayesian_optimization
+    bayesian_optimization,
+    optimal_service_level
 )
 from ttictoc import TicToc
 from config import set_config
@@ -51,7 +52,8 @@ def main():
         'simple_search_example':simple_search_example,
         'nonlinear': nonlinear_example,
         'question': question,
-        'bayesian': bayesian_optimization
+        'bayesian': bayesian_optimization,
+        'service': optimal_service_level
     }
 
     # Select what to do based on input arguments

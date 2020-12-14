@@ -4,11 +4,14 @@ from warnings import catch_warnings
 from warnings import simplefilter
 from collections import defaultdict
 from concepts.Automatic_differentiation.reverse_accumulation import reverse_autodiff, Overloader
+from concepts.service_levels.optimizer import Optimizer
 from concepts.interview.question_class import Graph
 from concepts.Gradient_boosting.regression_tree import regression_tree
 from sklearn.datasets import load_boston
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.tree import DecisionTreeRegressor
 import autograd.numpy as numpy
 import time
@@ -653,7 +656,7 @@ def mean_squared_error(observations, predictions):
     squared_error = (observations-predictions)**2
     return np.mean(squared_error)
 
-def search(data, start=0.5, samples = 20, starting_value=None):
+def search(data, start=0.5, samples = 50, starting_value=None):
     # Store the samples
     data = pd.DataFrame(data)
     alpha_chain = numpy.array([0.]*samples)
@@ -888,7 +891,7 @@ def bayesian(data, samples = 5, starting_value=None):
             return model.predict(X)
     def opt_acquisition(X, y, model):
     	# random search, generate random samples
-        Xsamples = np.array([round(np.random.rand(),2) for i in range(10)]).reshape(-1 ,1)
+        Xsamples = np.array([round(np.random.rand(),4) for i in range(10)]).reshape(-1 ,1)
         # calculate the acquisition function for each sample
         scores = acquisition(X, Xsamples, model)
         # locate the index of the largest scores
@@ -904,9 +907,9 @@ def bayesian(data, samples = 5, starting_value=None):
         # calculate the probability of improvement
         scores = sample_output-best
         return scores
-    samples = [round(np.random.rand(),2) for i in range(5)]
+    samples = [round(np.random.rand(),4) for i in range(5)]
     errors, samples = sampler(samples=samples, data=data)
-    model = GaussianProcessRegressor()
+    model = MLPRegressor()
     model.fit(np.array(samples).reshape(-1, 1), np.array(errors))
     for i in range(50):
         # select the next point to sample
@@ -928,3 +931,13 @@ def bayesian_optimization():
     optimal_value, lowest_cost = bayesian(data, starting_value=starting_value)
     elapsedTime = time.time() - startTime
     print(optimal_value, elapsedTime)
+
+
+def optimal_service_level():
+    time_start = time.time()
+    directory = get_config("directories", "service_levels")
+    data = Optimizer.load('service_levels.xlsx', directory)
+    optimizer = Optimizer(constraint=0.96, data=data)
+    optimizer.forward_pass()
+    elapsedTime = time.time() - time_start
+    pass
