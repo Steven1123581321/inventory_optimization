@@ -940,7 +940,9 @@ def optimal_service_level():
     data_sorted = data.sort_values('Demand', ascending =False)
     optimizer = Optimizer(constraint=0.96, data=data_sorted)
     optimizer.forward_pass()
+    fittime = time.time() - time_start
     optimizer.backward_pass()
+    optimizetime = (time.time() - time_start)-fittime
     data_sorted['Service_Level'] = data.index.map(optimizer.service_levels)
     data = data_sorted.sort_values('Item')
     lower_bound= get_config("bounds_service_levels", "lower_bound")
@@ -955,3 +957,5 @@ def optimal_service_level():
     print("The costs for our algorithm are: " + str(own_costs))
     print(-(1-own_costs/teunter_costs))
     print(optimizer.data)
+    print(fittime)
+    print(optimizetime)

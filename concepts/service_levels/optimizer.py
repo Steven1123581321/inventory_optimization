@@ -8,8 +8,8 @@ class Optimizer:
     A class that performs dynamic programming to optimize service levels over n-items.
     '''
 
-    pieces = None
-    matrix_values = None
+    items = None
+    matrices = None
     demand_constraint = None
     service_levels = None
 
@@ -71,54 +71,55 @@ class Optimizer:
         indicating how many pieces we take to the next period
         and how many we have left in this period.
         '''
+
         aggregated_demand = np.sum(self.data.Demand)
         demand_constraint = int((1-self.constraint)*aggregated_demand)
         self.demand_constraint = demand_constraint
-        pieces = []
+        items = []
         for index, row in self.data.iterrows():
-            dict_1 = {}
-            for piece in range(int(np.round(min(self.demand_constraint, row.Demand),0))+1):
-                service_level = min((row.Demand-piece)/row.Demand, 1.)
+            value_dictionary = {}
+            m = int(min(self.demand_constraint, row.Demand))+1
+            for alpha in range(m):
+                service_level = min((row.Demand-alpha)/row.Demand, 1.)
                 partial_expectation = (row.Quantity * (1. - service_level))/row.DDLT_Variation
-                value = np.round((4.85-(partial_expectation**1.3)*0.3924-(partial_expectation**0.135)*5.359)*row.DDLT_Variation*row.Inventory_Costs, 2)
-                dict_1[piece] = value
-            pieces.append(dict_1)
-        focus_values = []
-        matrix = []
-        for i in range(len(pieces)):
-            if i == 0:
-                focus_values.append(list(pieces[i].values()))
+                value = (4.85-(partial_expectation**1.3)*0.3924-(partial_expectation**0.135)*5.359)*row.DDLT_Variation*row.Inventory_Costs
+                value_dictionary[alpha] = value
+            items.append(value_dictionary)
+        predecessor_values = []
+        matrices = []
+        for i in range(len(items)):
+            if i > 0 and i < len(items)-1:
                 matrix_values = {}
-                for key in pieces[i]:
-                    matrix_values[pieces[i][key]] = (0, key)
-                matrix.append(matrix_values)
-            elif i == len(pieces)-1:
-                matrix_values = {}
-                for key in pieces[i]:
-                    matrix_values[pieces[i][key] + predecessor[min(self.data.iloc[i-1].Demand, self.demand_constraint)-key]] = key
-                matrix.append(matrix_values)
-                self.matrix_values = matrix
-                self.pieces = pieces
+                minimum_alpha_values = []
+                for alpha in items[i]:
+                    elements = []
+                    matrix_elements_dictionary = {}
+                    for j in range(alpha+1):
+                        if j <= alpha:
+                            z = items[i][j]+predecessor[alpha-j]
+                            if j == 0:
+                                matrix_elements_dictionary[z] = alpha-j
+                                x = z
+                                p = z
+                            elif p < z:
+                                x = p
+                            else:
+                                matrix_elements_dictionary[z] = alpha-j
+                                p = z
+                                x = p
+                    minimum_alpha_values.append(x)
+                    matrix_values[alpha] = (matrix_elements_dictionary[x])
+                matrices.append(matrix_values)
+            elif i == len(items)-1:
+                matrix_values = {items[i][key] + predecessor[min(self.data.iloc[i-1].Demand, self.demand_constraint)-key]: key for key in items[i]}
+                matrices.append(matrix_values)
+                self.matrices = matrices
+                self.items = items
                 return
             else:
-                matrix_values = {}
-                fractions = []
-                for key in pieces[i]:
-                    quarks = []
-                    dict_2 = {}
-                    for j in range(key+1):
-                        if j <= key:
-                            z = pieces[i][j]+predecessor[key-j]
-                            quarks.append(z)
-                            dict_2[z] = key-j
-                        x = min(quarks)
-                    fractions.append(x)
-                    matrix_values[key] = (dict_2[x])
-                focus_values.append(fractions)
-                matrix.append(matrix_values)
-            predecessor = {}
-            for k in range(len(focus_values[i])):
-                predecessor[k] = focus_values[i][k]
+                minimum_alpha_values = list(items[i].values())
+                matrices.append({})
+            predecessor = minimum_alpha_values
 
     def backward_pass(self):
         '''
@@ -126,25 +127,24 @@ class Optimizer:
         The output is a dictionary with n-keys with the optimal service level per key (item).
         '''
         service_levels = {}
-        for i in range(len(self.pieces)-1, -1, -1):
+        for i in range(len(self.items)-1, -1, -1):
             if i == 0:
-                service_levels[i] = max(0, self.data.iloc[i].Demand - (self.demand_constraint-take_with_me))/self.data.iloc[i].Demand
+                service_levels[i] = max(0, self.data.iloc[i].Demand-take)/self.data.iloc[i].Demand
                 self.service_levels = service_levels
                 return
-            if i == len(self.pieces)-1:
-                x = self.matrix_values[i][min(self.matrix_values[i].keys())]
-                service_levels[i] = (self.data.iloc[i].Demand-x)/self.data.iloc[i].Demand
-                demand = service_levels[i]*self.data.iloc[i].Demand
-                take_with_me = self.data.iloc[i].Demand-demand
+            if i == len(self.items)-1:
+                leave = self.matrices[i][min(self.matrices[i].keys())]
+                service_levels[i] = (self.data.iloc[i].Demand-leave)/self.data.iloc[i].Demand
+                fill_rate_amount = service_levels[i]*self.data.iloc[i].Demand
             else:
-                y = self.matrix_values[i][min(self.data.iloc[i].Demand, self.demand_constraint)-take_with_me]
-                service_levels[i] = (self.data.iloc[i].Demand-min(self.data.iloc[i].Demand, self.demand_constraint)+y+take_with_me)/self.data.iloc[i].Demand
-                demand = service_levels[i]*self.data.iloc[i].Demand
-                take_with_me += self.data.iloc[i].Demand-demand
+                take = self.matrices[i][min(self.data.iloc[i].Demand, self.demand_constraint)-leave]
+                service_levels[i] = (self.data.iloc[i].Demand-min(self.data.iloc[i].Demand, self.demand_constraint)+take+leave)/self.data.iloc[i].Demand
+                fill_rate_amount = service_levels[i]*self.data.iloc[i].Demand
+                leave += self.data.iloc[i].Demand-fill_rate_amount
 
     def group_service(self, data=None):
         '''
-        Computers the overall service level to check if the algorithm has run correctly.
+        Computes the overall service level to check if the algorithm has run correctly.
         The output is a return of the group service level.
         '''
         if data is None:
@@ -187,7 +187,7 @@ class Optimizer:
         value_own = sum((4.85-(pe_array**1.3)*0.3924-(pe_array**0.135)*5.359)*data.DDLT_Variation*data.Inventory_Costs)
         pe_array = np.array(data.apply(lambda row: (row.Quantity * (1. - row.Service_Level_Teunter))/row.DDLT_Variation, axis=1))
         value_teunter = sum((4.85-(pe_array**1.3)*0.3924-(pe_array**0.135)*5.359)*data.DDLT_Variation*data.Inventory_Costs)
-        self.data=data
+        self.data = data
         return value_own, value_teunter
 
 
