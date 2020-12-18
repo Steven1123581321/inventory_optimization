@@ -79,7 +79,6 @@ class Optimizer:
                     D = self.data.iloc[i].Demand
                     s = self.data.iloc[i].DDLT_Variation
                     h = self.data.iloc[i].Inventory_Costs
-                    scalar_values = []
                     for beta in range(alpha, -1, -1):
                         scalar = {alpha:value_function(max(D-alpha+beta, 0), Q, D, s, h)+predecessor[beta]}
                         if beta == alpha:

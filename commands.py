@@ -937,14 +937,14 @@ def optimal_service_level():
     time_start = time.time()
     directory = get_config("directories", "service_levels")
     data = Optimizer.load('service_levels.xlsx', directory)
-    optimizer = Optimizer(constraint=0.75, data=data)
+    lower_bound= get_config("bounds_service_levels", "lower_bound")
+    upper_bound= get_config("bounds_service_levels", "upper_bound")
+    optimizer = Optimizer(constraint=0.96, data=data)
     optimizer.forward_pass()
     fittime = time.time() - time_start
     optimizer.backward_pass()
     optimizetime = (time.time() - time_start)-fittime
     data['Service_Level'] = data.index.map(optimizer.service_levels)
-    lower_bound= get_config("bounds_service_levels", "lower_bound")
-    upper_bound= get_config("bounds_service_levels", "upper_bound")
     data.Service_Level = data.apply(lambda row: max(lower_bound, min(upper_bound, row.Service_Level)), axis=1)
     elapsedTime = time.time() - time_start
     group_service_level = optimizer.group_service(data=data)
