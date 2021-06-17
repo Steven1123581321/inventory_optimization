@@ -18,11 +18,13 @@ from commands import (
     metropolis_hasting_example2,
     metropolis_hasting_example3,
     metropolis_hasting_example4,
+    metropolis_hasting_example5,
     simple_search_example,
     nonlinear_example,
     question,
     bayesian_optimization,
-    optimal_service_level
+    optimal_service_level,
+    wagelmans_execution
 )
 from ttictoc import TicToc
 from config import set_config
@@ -49,11 +51,13 @@ def main():
         'metropolis_hasting_example2':metropolis_hasting_example2,
         'metropolis_hasting_example3':metropolis_hasting_example3,
         'metropolis_hasting_example4': metropolis_hasting_example4,
+        'metropolis_hasting_example5': metropolis_hasting_example5,
         'simple_search_example':simple_search_example,
         'nonlinear': nonlinear_example,
         'question': question,
         'bayesian': bayesian_optimization,
-        'service': optimal_service_level
+        'service': optimal_service_level,
+        'wagelmans': wagelmans_execution
     }
 
     # Select what to do based on input arguments

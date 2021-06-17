@@ -13,6 +13,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.tree import DecisionTreeRegressor
+from concepts.Sampling.Metropolis_hastings import prior_probability, likelihood_probability, posterior_probability, proposal_function
 import autograd.numpy as numpy
 import time
 from autograd import grad
@@ -37,6 +38,7 @@ warnings.filterwarnings("ignore")
 #BISECTION ALGORITHM#
 #Deterministic EOQ with waste#
 ##########################################
+
 
 def bisection_example():
     cost_parameters = get_config("cost_parameters")
@@ -110,6 +112,7 @@ def hooke_reeves_example():
     solution = hooke_reeves(f, [50], 1, 0.01, [1])
     for i in range(len(solution)):
         print("x"+str(i)+"=", solution[i])
+
 
 def hooke_reeves(f, x, a, eps, minimum, fraction=0.5):
     y, n = f(x), len(x)
@@ -608,7 +611,7 @@ def gradient_boosting_quantile_regression_example():
     tree.load('boston')
     tree.prepare_dataset()
     M = 100
-    Quantile = 0.75
+    Quantile = 0.95
     learning_rate = 0.01
     f_0 = np.quantile(tree.y_train, Quantile)
     output_data = pd.DataFrame(tree.y_train)
@@ -868,6 +871,7 @@ def mean_squared_error(observations, predictions):
     squared_error = (observations-predictions)**2
     return np.mean(squared_error)
 
+
 def bayesian(data, samples = 5, starting_value=None):
     data = pd.DataFrame(data)
     def sampler(samples=None, data=None):
@@ -957,3 +961,148 @@ def optimal_service_level():
     print(optimizer.data)
     print(fittime)
     print(optimizetime)
+
+
+##########################################
+#Metropolis-Hastings algorithm for forecasting#
+##########################################
+
+def metropolis_hasting_example5():
+    sample_size = 500
+    sigma_e = 3.0
+    a = 1.0
+    b = 2.0
+    random_num_generator = np.random.RandomState(0)
+    x = 10.0 * random_num_generator.rand(sample_size)
+    e = random_num_generator.normal(0, sigma_e, sample_size)
+    y = a + b * x + e
+    # plt.scatter(x, y, color='blue')
+    # # Point estimation the model parameters (frequentist view)
+    # X = np.vstack((np.ones(sample_size), x)).T
+    # params_closed_form = np.append(np.linalg.inv(X.T.dot(X)).dot(X.T).dot(y), (sqrt(np.mean((y-(1.0 + 2.0*x))**2))))
+    # print('pamameters: %.7f, %.7f, %.7f' %(params_closed_form[0], params_closed_form[1], params_closed_form[2]))
+    # plt.show()
+    beta_0 = [0.5, 0.5]
+    results = np.zeros([50000,2])
+    results[0,0] = beta_0[0]
+    results[0, 1] = beta_0[1]
+    for step in range(1, 50000):
+        print('step: {}'.format(step))
+
+        beta_old = results[step-1, :]
+        beta_proposal = proposal_function(beta_old)
+
+        # Use np.exp to restore from log numbers
+        prob = np.exp(posterior_probability(beta_proposal, x, y, sigma_e) - posterior_probability(beta_old, x, y, sigma_e))
+
+        if np.random.uniform(0,1) < prob:
+            results[step, :] = beta_proposal
+        else:
+            results[step, :] = beta_old
+
+    burn_in = 10000
+    beta_posterior = results[burn_in:, :]
+    print(beta_posterior.mean(axis=0))
+
+    # present the results
+    fig = plt.figure()
+    ax1 = fig.add_subplot(121)
+    ax1.hist(beta_posterior[:,0], bins=20, color='blue')
+    ax1.axvline(beta_posterior.mean(axis=0)[0], color='red', linestyle='dashed', linewidth=2)
+    ax1.title.set_text('Posterior -- Intercept')
+    ax2 = fig.add_subplot(122)
+    ax2.hist(beta_posterior[:,1], bins=20, color='blue')
+    ax2.axvline(beta_posterior.mean(axis=0)[1], color='red', linestyle='dashed', linewidth=2)
+    ax2.title.set_text('Posterior -- Slope')
+    plt.show()
+
+
+##################################################
+#WHK-algorithm for constant holding costs##
+#################################################
+
+def wagelmans_execution():
+    n = [5, 10, 20, 40, 80, 160, 320, 640, 1280]
+    times = {}
+    for index, number in enumerate(n, 1):
+        demand = {i:random.randint(10,150) for i in range(1, number+1)}
+        # demand = {1: 10, 2: 60, 3: 15, 4: 150, 5: 110}
+        h = 1
+        o = 100
+        start = time.time()
+        s_t, values = wagelmans_algorithm(demand, h, o)
+        end = time.time()
+        times.update({number: end-start})
+    keys = times.keys()
+    values = times.values()
+    plt.plot(values, keys)
+    plt.show()
+    print(values)
+
+def wagelmans_algorithm(demand, h, o):
+    T = max(demand.keys())
+    S = [T, T+1]
+    t = T
+    s_t = {
+        T: T+1
+    }
+    s_t_value = T+1
+    values = {
+            T+1: 0.,
+            T: o+h*demand[T]
+    }
+    # Do step 1.
+    while t-1>0:
+        t -= 1
+        # Do step 2.
+        for index, k in enumerate(S):
+            # Calculate k and l.
+            if k < s_t_value:
+                l = S[index+1]
+            else:
+                s_t_value = S[index]
+                # calculate sum of demands from t to s-1.
+                demands_s2 = sum(map(demand.get, range(t, s_t_value)))
+                # Calculate Z_t  
+                values.update({t: o+values[k]+ c*h*demands_s2})
+                s_t.update({t: s_t_value})
+                break
+            # Calculating d_k to d_(l-1)
+            demands_dk = sum(map(demand.get, range(k, l)))
+            # Finalizing step 2.
+            c = (int(T)-t+1)*h
+            value = (values[k]-values[l])/demands_dk
+            if value < c:
+                s_t_value = S[index]
+                # calculate sum of demands from t to s-1.
+                demands_s1 = sum(map(demand.get, range(t, s_t_value)))
+                # Calculate Z_t    
+                values.update({t: o+values[k]+ c*h*demands_s1})
+                s_t.update({t: s_t_value})
+                break
+            else:
+                continue
+        # Starting step 3.
+        tr_value = None
+        for t_r in S:
+            while t_r < s_t_value:
+                demands_tr = sum(map(demand.get, range(t, t_r)))
+                index_tr = S.index(t_r)
+                demands_tr_plus_one = sum(map(demand.get, range(t_r, S[index_tr+1])))
+                left_side = (values[t]-values[t_r])/demands_tr
+                right_side = (values[t_r]-values[S[index_tr+1]])/demands_tr_plus_one
+                if left_side > right_side:
+                    tr_value = t_r
+                    break
+                else:
+                    t_r = S[index_tr+1]
+                    continue
+            if tr_value:
+                S = [s for s in S if s >= tr_value]
+                S.insert(0, t)
+            else:
+                S = [s for s in S if s >= s_t_value]
+                S.insert(0, t)
+            break
+    # Starting step 4.
+    return s_t, values
